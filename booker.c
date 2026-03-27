@@ -6,7 +6,12 @@
 #include "GUI_Paint.h"
 #include "fonts.h"
 
+#include "book_data.h"
+
 #define TEST_FONT Font20
+
+extern const char test[];
+extern const int test_len;
 
 int EPD_2IN7_V2_test(void) {
     printf("EPD_2IN7_V2_test Demo\r\n");
@@ -292,7 +297,55 @@ int EPD_2IN7_V2_test(void) {
     return 0;
 }
 
-const char* lorem_ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+// MAX CHARACTER COUNT: 550 (including spaces and punctuation)
+// THATS FOR FULL SCREEN, SHOULD BE LESS AFTER ADDING PAGE COUNTER.
+const char* lorem_ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.  EXTRA: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt abcdef";
+
+static void DrawBookText(UWORD x0, UWORD y0, const uint8_t *data, size_t len,
+                         sFONT *font, UWORD bg, UWORD fg)
+{
+    UWORD x = x0;
+    UWORD y = y0;
+
+    for (size_t i = 0; i < len; i++) {
+        uint8_t c = data[i];
+
+        // Ignore CR in Windows line endings (\r\n)
+        if (c == '\r') {
+            continue;
+        }
+
+        // New line
+        if (c == '\n') {
+            x = x0;
+            y += font->Height;
+
+            if (y + font->Height > EPD_2IN7_V2_HEIGHT) {
+                break;
+            }
+            continue;
+        }
+
+        // Skip other control chars
+        if (c < 32 || c > 126) {
+            // For now replace unsupported bytes with space
+            c = ' ';
+        }
+
+        // Wrap line
+        if (x + font->Width > EPD_2IN7_V2_WIDTH) {
+            x = x0;
+            y += font->Height;
+
+            if (y + font->Height > EPD_2IN7_V2_HEIGHT) {
+                break;
+            }
+        }
+
+        Paint_DrawChar(x, y, (char)c, font, bg, fg);
+        x += font->Width;
+    }
+}
 
 int main(void)
 {
@@ -317,13 +370,13 @@ int main(void)
 
     Paint_NewImage(TextImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 0, WHITE);
     Paint_Clear(WHITE);
-    Paint_DrawString_EN(8, 8, lorem_ipsum, &Font12, WHITE, BLACK);
+    DrawBookText(0, 0, book_data, book_data_len, &Font12, BLACK, WHITE);
 
     EPD_2IN7_V2_Display(TextImage);
     DEV_Delay_ms(9000);
 
     // ---------- PARTIAL REFRESH DEMO ----------
-
+    #if 0
     // Important: set a clean base image first for partial refresh
     EPD_2IN7_V2_Init();
     EPD_2IN7_V2_Display_Base(TextImage);
@@ -380,6 +433,8 @@ int main(void)
 
     free(PartialImage);
     free(TextImage);
+    
+    #endif
 
     EPD_2IN7_V2_Sleep();
 
