@@ -1,8 +1,7 @@
 # USAGE:
-# python ./tools/txt_converter.py assets/test.txt book_data.h book_data 
+# python ./tools/txt_converter.py assets/test.txt book_data.h book_data
 
 import sys
-import os
 from pathlib import Path
 
 
@@ -23,9 +22,21 @@ def sanitize_name(name: str) -> str:
     return s
 
 
+def normalize_text_bytes(data: bytes) -> bytes:
+    # Remove UTF-8 BOM if present
+    if data.startswith(b"\xEF\xBB\xBF"):
+        data = data[3:]
+
+    # Normalize line endings
+    data = data.replace(b"\r\n", b"\n")
+    data = data.replace(b"\r", b"\n")
+
+    return data
+
+
 def main():
     if len(sys.argv) != 4:
-        print("Usage: python text_to_header.py <input.txt> <output.h> <symbol_name>")
+        print("Usage: python txt_converter.py <input.txt> <output.h> <symbol_name>")
         sys.exit(1)
 
     input_path = Path(sys.argv[1])
@@ -37,6 +48,7 @@ def main():
         sys.exit(1)
 
     data = input_path.read_bytes()
+    data = normalize_text_bytes(data)
 
     guard = f"{symbol_name.upper()}_H"
 
@@ -49,13 +61,13 @@ def main():
     lines.append("")
     lines.append(f"static const uint8_t {symbol_name}[] = {{")
 
-    for i in range(0, len(data), 12):
-        chunk = data[i:i + 12]
-        hex_bytes = ", ".join(f"0x{b:02X}" for b in chunk)
-        lines.append(f"    {hex_bytes},")
-
     if len(data) == 0:
         lines.append("    0x00,")
+    else:
+        for i in range(0, len(data), 12):
+            chunk = data[i:i + 12]
+            hex_bytes = ", ".join(f"0x{b:02X}" for b in chunk)
+            lines.append(f"    {hex_bytes},")
 
     lines.append("};")
     lines.append("")

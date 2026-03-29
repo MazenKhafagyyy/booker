@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include <stdlib.h>     // malloc() free()
+#include <string.h>     // memset()
 #include "DEV_Config.h"
 #include "EPD_2in7_V2.h"
 #include "GUI_Paint.h"
@@ -8,349 +9,309 @@
 
 #include "book_data.h"
 
-#define TEST_FONT Font20
+#define PIN_D1     21   // LED
+#define PIN_D2     20   // LED
+#define PIN_K1     18   // BUTTON
+#define PIN_K2     17   // BUTTON
+
+#define BOOK_FONT        Font12
+#define SCREEN_W         EPD_2IN7_V2_WIDTH
+#define SCREEN_H         EPD_2IN7_V2_HEIGHT
+#define CHAR_W           BOOK_FONT.Width
+#define CHAR_H           BOOK_FONT.Height
+#define FOOTER_LINES     1
+#define MAX_TOTAL_LINES  (SCREEN_H / CHAR_H)
+#define CHARS_PER_LINE   (SCREEN_W / CHAR_W)
+#define MAX_PAGE_LINES   (MAX_TOTAL_LINES - FOOTER_LINES)
+#define FOOTER_LINE_Y    (MAX_PAGE_LINES * CHAR_H)
+#define CHARS_PER_PAGE   (MAX_PAGE_LINES * (SCREEN_W / CHAR_W))
 
 extern const char test[];
 extern const int test_len;
 
-int EPD_2IN7_V2_test(void) {
-    printf("EPD_2IN7_V2_test Demo\r\n");
-    if(DEV_Module_Init()!=0){
-        return -1;
-    }
+char ** pages;
+int num_pages;
 
-    printf("e-Paper Init and Clear...\r\n");
-	EPD_2IN7_V2_Init();
-    EPD_2IN7_V2_Clear();
-
-
-    //Create a new image cache
-    UBYTE *BlackImage;
-    UWORD Imagesize = ((EPD_2IN7_V2_WIDTH % 8 == 0)? (EPD_2IN7_V2_WIDTH / 8 ): (EPD_2IN7_V2_WIDTH / 8 + 1)) * EPD_2IN7_V2_HEIGHT;
-    if((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
-        printf("Failed to apply for black memory...\r\n");
-        return -1;
-    }
-    printf("Paint_NewImage\r\n");
-    Paint_NewImage(BlackImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 90, WHITE);
-	Paint_Clear(WHITE);
-	
-#if 0   // show bmp
-    printf("show image for array\r\n");
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-    Paint_DrawBitMap(gImage_2in7);
-    EPD_2IN7_V2_Display(BlackImage);
-    DEV_Delay_ms(500);
-
-#endif
-
-#if 1  // Drawing on the image
-	Paint_NewImage(BlackImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 90, WHITE);  	
-    printf("Drawing\r\n");
-    //1.Select Image
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-	
-    // 2.Drawing on the image
-    printf("Drawing:BlackImage\r\n");
-    Paint_DrawPoint(10, 80, BLACK, DOT_PIXEL_1X1, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 90, BLACK, DOT_PIXEL_2X2, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 100, BLACK, DOT_PIXEL_3X3, DOT_STYLE_DFT);
-
-    Paint_DrawLine(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(70, 70, 20, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-    Paint_DrawRectangle(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(80, 70, 130, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
-    Paint_DrawCircle(45, 95, 20, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(105, 95, 20, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
-    Paint_DrawLine(85, 95, 125, 95, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawLine(105, 75, 105, 115, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-
-    Paint_DrawString_EN(10, 0, "waveshare", &Font16, BLACK, WHITE);
-    Paint_DrawString_EN(10, 20, "hello world", &Font12, WHITE, BLACK);
-
-    Paint_DrawNum(10, 33, 123456789, &Font12, BLACK, WHITE);
-    Paint_DrawNum(10, 50, 987654321, &Font16, WHITE, BLACK);
-
-    EPD_2IN7_V2_Display_Base(BlackImage);
-    DEV_Delay_ms(3000);
-#endif
-
-#if 1  // Fast Drawing on the image
-    // Fast refresh
-    printf("This is followed by a quick refresh demo\r\n");
-    printf("First, clear the screen\r\n");
-    EPD_2IN7_V2_Init();
-    EPD_2IN7_V2_Clear();
-
-    printf("e-Paper Init Fast\r\n");
-    EPD_2IN7_V2_Init_Fast();
-	Paint_NewImage(BlackImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 90, WHITE);  	
-    printf("Drawing\r\n");
-    //1.Select Image
-    Paint_SelectImage(BlackImage);
-    Paint_Clear(WHITE);
-
-    // printf("show window BMP-----------------\r\n");
-    // Paint_SelectImage(BlackImage);
-    // Paint_Clear(WHITE);
-    // // Paint_DrawBitMap(gImage_2in7);
-    // EPD_2IN7_V2_Display_Fast(BlackImage);
-    // DEV_Delay_ms(500);
-
-    // 2.Drawing on the image
-    Paint_Clear(WHITE);
-    printf("Drawing:BlackImage\r\n");
-    Paint_DrawPoint(10, 80, BLACK, DOT_PIXEL_1X1, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 90, BLACK, DOT_PIXEL_2X2, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 100, BLACK, DOT_PIXEL_3X3, DOT_STYLE_DFT);
-
-    Paint_DrawLine(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(70, 70, 20, 120, BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-
-    Paint_DrawRectangle(20, 70, 70, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(80, 70, 130, 120, BLACK, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
-    Paint_DrawCircle(45, 95, 20, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(105, 95, 20, WHITE, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-
-    Paint_DrawLine(85, 95, 125, 95, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawLine(105, 75, 105, 115, BLACK, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-
-    Paint_DrawString_EN(10, 0, "waveshare", &Font16, BLACK, WHITE);
-    Paint_DrawString_EN(10, 20, "hello world", &Font12, WHITE, BLACK);
-
-    Paint_DrawNum(10, 33, 123456789, &Font12, BLACK, WHITE);
-    Paint_DrawNum(10, 50, 987654321, &Font16, WHITE, BLACK);
-
-    EPD_2IN7_V2_Display_Fast(BlackImage);
-    DEV_Delay_ms(3000);
-
-#endif
-
-#if 1   //Partial refresh, example shows time    	
-    // If you didn't use the EPD_2IN7_V2_Display_Base() function to refresh the image before,
-    // use the EPD_2IN7_V2_Display_Base_color() function to refresh the background color, 
-    // otherwise the background color will be garbled 
-    EPD_2IN7_V2_Init();
-    // EPD_2IN7_V2_Display_Base_color(WHITE);
-	Paint_NewImage(BlackImage, 50, 120, 90, WHITE);
-    
-    printf("Partial refresh\r\n");
-    Paint_SelectImage(BlackImage);
-	Paint_SetScale(2);
-    Paint_Clear(WHITE);
-    
-    PAINT_TIME sPaint_time;
-    sPaint_time.Hour = 12;
-    sPaint_time.Min = 34;
-    sPaint_time.Sec = 56;
-    UBYTE num = 150;
-    for (;;) {
-        sPaint_time.Sec = sPaint_time.Sec + 1;
-        if (sPaint_time.Sec == 60) {
-            sPaint_time.Min = sPaint_time.Min + 1;
-            sPaint_time.Sec = 0;
-            if (sPaint_time.Min == 60) {
-                sPaint_time.Hour =  sPaint_time.Hour + 1;
-                sPaint_time.Min = 0;
-                if (sPaint_time.Hour == 24) {
-                    sPaint_time.Hour = 0;
-                    sPaint_time.Min = 0;
-                    sPaint_time.Sec = 0;
-                }
-            }
-        }
-        
-        Paint_Clear(WHITE);
-		Paint_DrawRectangle(1, 1, 120, 50, BLACK, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-        Paint_DrawTime(10, 15, &sPaint_time, &Font20, WHITE, BLACK);
-
-        num = num - 1;
-        if(num == 0) {
-            break;
-        }
-		printf("Part refresh...\r\n");
-        EPD_2IN7_V2_Display_Partial(BlackImage, 60, 134, 110, 254); // Xstart must be a multiple of 8
-        DEV_Delay_ms(500);
-    }
-#endif
-
-#if 1 // show image for array
-    free(BlackImage);
-    printf("show Gray------------------------\r\n");
-    Imagesize = ((EPD_2IN7_V2_WIDTH % 4 == 0)? (EPD_2IN7_V2_WIDTH / 4 ): (EPD_2IN7_V2_WIDTH / 4 + 1)) * EPD_2IN7_V2_HEIGHT;
-    if((BlackImage = (UBYTE *)malloc(Imagesize)) == NULL) {
-        printf("Failed to apply for black memory...\r\n");
-        return -1;
-    }
-    EPD_2IN7_V2_Init_4GRAY();
-    printf("4 grayscale display\r\n");
-    Paint_NewImage(BlackImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 90, WHITE);
-    Paint_SetScale(4);
-    Paint_Clear(0xff);
-    
-    Paint_DrawPoint(10, 80, GRAY4, DOT_PIXEL_1X1, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 90, GRAY4, DOT_PIXEL_2X2, DOT_STYLE_DFT);
-    Paint_DrawPoint(10, 100, GRAY4, DOT_PIXEL_3X3, DOT_STYLE_DFT);
-    Paint_DrawLine(20, 70, 70, 120, GRAY4, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawLine(70, 70, 20, 120, GRAY4, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
-    Paint_DrawRectangle(20, 70, 70, 120, GRAY4, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawRectangle(80, 70, 130, 120, GRAY4, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawCircle(45, 95, 20, GRAY4, DOT_PIXEL_1X1, DRAW_FILL_EMPTY);
-    Paint_DrawCircle(105, 95, 20, GRAY2, DOT_PIXEL_1X1, DRAW_FILL_FULL);
-    Paint_DrawLine(85, 95, 125, 95, GRAY4, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawLine(105, 75, 105, 115, GRAY4, DOT_PIXEL_1X1, LINE_STYLE_DOTTED);
-    Paint_DrawString_EN(10, 0, "waveshare", &Font16, GRAY4, GRAY1);
-    Paint_DrawString_EN(10, 20, "hello world", &Font12, GRAY3, GRAY1);
-    Paint_DrawNum(10, 33, 123456789, &Font12, GRAY4, GRAY2);
-    Paint_DrawNum(10, 50, 987654321, &Font16, GRAY1, GRAY4);
-     Paint_DrawString_CN(150, 0,"���abc", &Font12CN, GRAY4, GRAY1);
-    Paint_DrawString_CN(150, 20,"���abc", &Font12CN, GRAY3, GRAY2);
-    Paint_DrawString_CN(150, 40,"���abc", &Font12CN, GRAY2, GRAY3);
-    Paint_DrawString_CN(150, 60,"���abc", &Font12CN, GRAY1, GRAY4);
-    Paint_DrawString_CN(10, 130, "΢ѩ����", &Font24CN, GRAY1, GRAY4);
-    EPD_2IN7_V2_4GrayDisplay(BlackImage);
-    DEV_Delay_ms(3000);
-
-    Paint_NewImage(BlackImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 0, WHITE);
-    Paint_SetScale(4);
-    Paint_Clear(WHITE);
-    // EPD_2IN7_V2_4GrayDisplay(gImage_2in7_4Gray);
-    DEV_Delay_ms(3000);
-
-#endif
-
-#if 1
-
-    EPD_2IN7_V2_Init();
-    EPD_2IN7_V2_Clear();
-    printf("Goto Sleep...\r\n");
-    EPD_2IN7_V2_Sleep();
-
-    int key=0; 
-
-    gpio_set_dir(KEY0, GPIO_IN);
-    gpio_pull_up(KEY0);//Need to pull up
-
-    gpio_set_dir(KEY1, GPIO_IN);
-    gpio_pull_up(KEY1);//Need to pull up
-
-    gpio_set_dir(KEY2, GPIO_IN);
-    gpio_pull_up(KEY2);//Need to pull up
-    while(1)
-    {
-        if(DEV_Digital_Read(KEY0 ) == 0 && key==0)
-        {
-            key=1;
-            EPD_2IN7_V2_Init();
-            // Paint_DrawBitMap(gImage_2in7);
-            EPD_2IN7_V2_Display(BlackImage);
-            DEV_Delay_ms(3000);
-        }
-
-        if(DEV_Digital_Read(KEY1 ) == 0 && key==0)
-        {
-            key=1;
-            EPD_2IN7_V2_Init_4GRAY();
-            // EPD_2IN7_V2_4GrayDisplay(gImage_2in7_4Gray);
-            DEV_Delay_ms(3000);
-        }
-
-        if(DEV_Digital_Read(KEY2 ) == 0 && key==0)
-        {
-            key=1;
-            EPD_2IN7_V2_Init_4GRAY();
-            // EPD_2IN7_V2_4GrayDisplay(gImage_2in7_4Gray_1);
-            DEV_Delay_ms(3000);
-        }
-
-        if(DEV_Digital_Read(KEY0 ) == 1&&DEV_Digital_Read(KEY1 ) == 1&&DEV_Digital_Read(KEY2 ) == 1 && key == 1 )
-        {
-            key=0;
-            EPD_2IN7_V2_Init();
-            EPD_2IN7_V2_Clear();
-            printf("Goto Sleep...\r\n");
-            EPD_2IN7_V2_Sleep();
-        }
-            
-    }
-
-#endif
-
-	printf("Clear...\r\n");
-	EPD_2IN7_V2_Init();
-    EPD_2IN7_V2_Clear();
-	
-    printf("Goto Sleep...\r\n");
-    EPD_2IN7_V2_Sleep();
-    free(BlackImage);
-    BlackImage = NULL;
-    DEV_Delay_ms(2000);//important, at least 2s
-    // close 5V
-    printf("close 5V, Module enters 0 power consumption ...\r\n");
-    DEV_Module_Exit();
-    return 0;
-}
-
-// MAX CHARACTER COUNT: 550 (including spaces and punctuation)
+// MAX CHARACTER COUNT: ??? (including spaces and punctuation)
+// Dimensions for font12: 25x24 characters
 // THATS FOR FULL SCREEN, SHOULD BE LESS AFTER ADDING PAGE COUNTER.
 const char* lorem_ipsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.  EXTRA: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt abcdef";
 
-static void DrawBookText(UWORD x0, UWORD y0, const uint8_t *data, size_t len,
-                         sFONT *font, UWORD bg, UWORD fg)
-{
+int generate_pages(const uint8_t* text, size_t text_len) {
+    if (text == NULL || text_len == 0) {
+        pages = NULL;
+        num_pages = 0;
+        return 0;
+    }
+
+    int max_pages = (int)(text_len / 16) + 4;
+    pages = (char**)malloc(max_pages * sizeof(char*));
+    if (pages == NULL) {
+        num_pages = 0;
+        return -1;
+    }
+
+    size_t i = 0;
+    num_pages = 0;
+
+    while (i < text_len) {
+        size_t page_cap = (MAX_PAGE_LINES * CHARS_PER_LINE) + MAX_PAGE_LINES + 1;
+        char *page = (char*)malloc(page_cap);
+        if (page == NULL) {
+            for (int k = 0; k < num_pages; k++) {
+                free(pages[k]);
+            }
+            free(pages);
+            pages = NULL;
+            num_pages = 0;
+            return -1;
+        }
+
+        size_t out = 0;
+        int lines_used = 0;
+
+        while (lines_used < MAX_PAGE_LINES && i < text_len) {
+            char line_buf[CHARS_PER_LINE + 1];
+            int line_len = 0;
+
+            // Skip leading spaces at start of line
+            while (i < text_len && text[i] == ' ') {
+                i++;
+            }
+
+            // Paragraph break at start of line: only if 2+ newlines in a row
+            if (i < text_len && text[i] == '\n') {
+                size_t j = i;
+                int newline_count = 0;
+
+                while (j < text_len && text[j] == '\n') {
+                    newline_count++;
+                    j++;
+                }
+
+                if (newline_count >= 2) {
+                    i = j;
+                    page[out++] = '\n';
+                    lines_used++;
+                    continue;
+                } else {
+                    // Single newline acts like a space
+                    i = j;
+                }
+            }
+
+            while (i < text_len) {
+                // Collapse spaces before the next word
+                while (i < text_len && text[i] == ' ') {
+                    i++;
+                }
+
+                if (i >= text_len) {
+                    break;
+                }
+
+                // Check newline run before reading a word
+                if (text[i] == '\n') {
+                    size_t j = i;
+                    int newline_count = 0;
+
+                    while (j < text_len && text[j] == '\n') {
+                        newline_count++;
+                        j++;
+                    }
+
+                    if (newline_count >= 2) {
+                        // Real paragraph break: end current line
+                        break;
+                    } else {
+                        // Single newline: treat as a space
+                        i = j;
+                        if (line_len > 0 && line_len < CHARS_PER_LINE) {
+                            line_buf[line_len++] = ' ';
+                        }
+                        continue;
+                    }
+                }
+
+                size_t word_start = i;
+                char word[CHARS_PER_LINE + 1];
+                int word_len = 0;
+
+                while (i < text_len && text[i] != ' ' && text[i] != '\n') {
+                    uint8_t c = text[i];
+
+                    // ASCII only for now
+                    if (c < 32 || c > 126) {
+                        c = ' ';
+                    }
+
+                    if (word_len < CHARS_PER_LINE) {
+                        word[word_len++] = (char)c;
+                    }
+                    i++;
+                }
+
+                if (word_len == 0) {
+                    continue;
+                }
+
+                int needed = (line_len == 0) ? word_len : (1 + word_len);
+
+                if (line_len + needed <= CHARS_PER_LINE) {
+                    if (line_len > 0) {
+                        line_buf[line_len++] = ' ';
+                    }
+                    memcpy(&line_buf[line_len], word, word_len);
+                    line_len += word_len;
+                } else {
+                    if (line_len == 0) {
+                        // Very long word: hard cut only if it starts an empty line
+                        int cut = (word_len > CHARS_PER_LINE) ? CHARS_PER_LINE : word_len;
+                        memcpy(line_buf, word, cut);
+                        line_len = cut;
+                    } else {
+                        // Move full word to next line
+                        i = word_start;
+                    }
+                    break;
+                }
+            }
+
+            // Trim trailing spaces
+            while (line_len > 0 && line_buf[line_len - 1] == ' ') {
+                line_len--;
+            }
+
+            if (line_len > 0) {
+                memcpy(&page[out], line_buf, line_len);
+                out += line_len;
+            }
+
+            lines_used++;
+
+            // Look ahead for paragraph break
+            if (i < text_len && text[i] == '\n') {
+                size_t j = i;
+                int newline_count = 0;
+
+                while (j < text_len && text[j] == '\n') {
+                    newline_count++;
+                    j++;
+                }
+
+                if (newline_count >= 2) {
+                    i = j;
+                    if (lines_used < MAX_PAGE_LINES) {
+                        page[out++] = '\n';
+                        lines_used++;
+                    }
+                } else {
+                    i = j;
+                }
+            }
+
+            if (lines_used < MAX_PAGE_LINES && i < text_len) {
+                page[out++] = '\n';
+            }
+        }
+
+        while (out > 0 && (page[out - 1] == '\n' || page[out - 1] == ' ')) {
+            out--;
+        }
+
+        page[out] = '\0';
+        pages[num_pages++] = page;
+    }
+
+    return num_pages;
+}
+
+static void DrawPageTextLimited(UWORD x0, UWORD y0, const char *data, sFONT *font, UWORD bg, UWORD fg) {
     UWORD x = x0;
     UWORD y = y0;
+    int lines_used = 1;
 
-    for (size_t i = 0; i < len; i++) {
-        uint8_t c = data[i];
+    for (size_t i = 0; data[i] != '\0'; i++) {
+        char c = data[i];
 
-        // Ignore CR in Windows line endings (\r\n)
         if (c == '\r') {
             continue;
         }
 
-        // New line
         if (c == '\n') {
             x = x0;
             y += font->Height;
+            lines_used++;
 
-            if (y + font->Height > EPD_2IN7_V2_HEIGHT) {
+            if (lines_used > MAX_PAGE_LINES) {
                 break;
             }
             continue;
         }
 
-        // Skip other control chars
-        if (c < 32 || c > 126) {
-            // For now replace unsupported bytes with space
-            c = ' ';
-        }
-
-        // Wrap line
-        if (x + font->Width > EPD_2IN7_V2_WIDTH) {
+        if ((x + font->Width) > SCREEN_W) {
             x = x0;
             y += font->Height;
+            lines_used++;
 
-            if (y + font->Height > EPD_2IN7_V2_HEIGHT) {
+            if (lines_used > MAX_PAGE_LINES) {
                 break;
             }
         }
 
-        Paint_DrawChar(x, y, (char)c, font, bg, fg);
+        Paint_DrawChar(x, y, c, font, bg, fg);
         x += font->Width;
     }
 }
 
+static void draw_page(UBYTE *image, int page_index) {
+    char footer[32];
+
+    Paint_SelectImage(image);
+    Paint_Clear(WHITE);
+
+    DrawPageTextLimited(0, 0, pages[page_index], &BOOK_FONT, BLACK, WHITE);
+
+    // line above footer
+    // Paint_DrawLine(0, FOOTER_LINE_Y - 2, SCREEN_W - 1, FOOTER_LINE_Y - 2,
+    //                BLACK, DOT_PIXEL_1X1, LINE_STYLE_SOLID);
+
+    snprintf(footer, sizeof(footer), "%d/%d", page_index + 1, num_pages);
+
+    int footer_len = (int)strlen(footer);
+    int footer_x = (SCREEN_W - footer_len * BOOK_FONT.Width) / 2;
+    if (footer_x < 0) footer_x = 0;
+
+    Paint_DrawString_EN((UWORD)footer_x, FOOTER_LINE_Y, footer, &BOOK_FONT, WHITE, BLACK);
+}
+
+static void free_pages(void) {
+    if (pages != NULL) {
+        for (int i = 0; i < num_pages; i++) {
+            free(pages[i]);
+        }
+        free(pages);
+        pages = NULL;
+    }
+    num_pages = 0;
+}
+
 int main(void)
 {
-    #if 1 // MY CODE
-    printf("PUT SOME TEXT IN\r\n");
+    // INITIALIZE BUTTONS AND LEDS
+    gpio_init(PIN_D1);
+    gpio_set_dir(PIN_D1, GPIO_OUT);
+    gpio_init(PIN_D2);
+    gpio_set_dir(PIN_D2, GPIO_OUT);
+
+    gpio_init(PIN_K1);
+    gpio_set_dir(PIN_K1, GPIO_IN);
+    gpio_pull_up(PIN_K1);
+
+    gpio_init(PIN_K2);
+    gpio_set_dir(PIN_K2, GPIO_IN);
+    gpio_pull_up(PIN_K2);
+
     if(DEV_Module_Init()!=0){
         return -1;
     }
@@ -361,25 +322,53 @@ int main(void)
     EPD_2IN7_V2_Clear();
 
     //Create a new image cache
-    UBYTE *TextImage;
+    UBYTE *PageImage;
     UWORD Imagesize = ((EPD_2IN7_V2_WIDTH % 8 == 0)? (EPD_2IN7_V2_WIDTH / 8 ): (EPD_2IN7_V2_WIDTH / 8 + 1)) * EPD_2IN7_V2_HEIGHT;
-    if((TextImage = (UBYTE *)malloc(Imagesize)) == NULL) {
+    if((PageImage = (UBYTE *)malloc(Imagesize)) == NULL) {
         printf("Failed to apply for memory...\r\n");
         return -1;
     }
 
-    Paint_NewImage(TextImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 0, WHITE);
-    Paint_Clear(WHITE);
-    DrawBookText(0, 0, book_data, book_data_len, &Font12, BLACK, WHITE);
+    Paint_NewImage(PageImage, EPD_2IN7_V2_WIDTH, EPD_2IN7_V2_HEIGHT, 0, WHITE);
 
-    EPD_2IN7_V2_Display(TextImage);
-    DEV_Delay_ms(9000);
+    if (generate_pages(book_data, book_data_len) <= 0) {
+        printf("Failed to generate pages\r\n");
+        free(PageImage);
+        return -1;
+    }
+
+    int current_page = 0;
+    draw_page(PageImage, current_page);
+    EPD_2IN7_V2_Display_Fast(PageImage);
+
+    // Button handling loop
+    while (1) {
+        if (gpio_get(PIN_K2) == 0) {   // next page
+            if (current_page < num_pages - 1) {
+                current_page++;
+                draw_page(PageImage, current_page);
+                EPD_2IN7_V2_Display_Fast(PageImage);
+                printf("Page %d/%d\r\n", current_page + 1, num_pages);
+            }
+            sleep_ms(200);
+        }
+
+        if (gpio_get(PIN_K1) == 0) {   // previous page
+            if (current_page > 0) {
+                current_page--;
+                draw_page(PageImage, current_page);
+                EPD_2IN7_V2_Display_Fast(PageImage);
+                printf("Page %d/%d\r\n", current_page + 1, num_pages);
+            }
+            sleep_ms(200);
+        }
+    }
 
     // ---------- PARTIAL REFRESH DEMO ----------
     #if 0
     // Important: set a clean base image first for partial refresh
     EPD_2IN7_V2_Init();
-    EPD_2IN7_V2_Display_Base(TextImage);
+    EPD_2IN7_V2_Display_Base(PageImage);
 
     // Define a small partial-update region
     #define PART_X      40    // must be multiple of 8
@@ -394,7 +383,7 @@ int main(void)
 
     if((PartialImage = (UBYTE *)malloc(PartialImageSize)) == NULL) {
         printf("Failed to allocate partial buffer...\r\n");
-        free(TextImage);
+        free(PageImage);
         return -1;
     }
 
@@ -432,15 +421,8 @@ int main(void)
     }
 
     free(PartialImage);
-    free(TextImage);
+    free(PageImage);
     
     #endif
-
-    EPD_2IN7_V2_Sleep();
-
-    #endif
-
-    // EPD_2IN7_V2_test();
-
     return 0;
 }
